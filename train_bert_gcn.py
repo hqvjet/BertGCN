@@ -6,7 +6,7 @@ import dgl
 import torch.utils.data as Data
 from ignite.engine import Events, create_supervised_evaluator, create_supervised_trainer, Engine
 from ignite.metrics import Accuracy, Loss
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, f1_score, classification_report
 import numpy as np
 import os
 import shutil
@@ -304,3 +304,102 @@ def log_training_results(trainer):
 log_training_results.best_val_acc = 0
 g = update_feature()
 trainer.run(idx_loader, max_epochs=nb_epochs)
+
+# Final test evaluation with detailed metrics
+logger.info("\n" + "="*80)
+logger.info("FINAL TEST EVALUATION")
+logger.info("="*80)
+
+# Load best model
+checkpoint_path = os.path.join(ckpt_dir, 'checkpoint.pth')
+if os.path.exists(checkpoint_path):
+    checkpoint = th.load(checkpoint_path)
+    model.bert_model.load_state_dict(checkpoint['bert_model'])
+    model.classifier.load_state_dict(checkpoint['classifier'])
+    model.gcn.load_state_dict(checkpoint['gcn'])
+    logger.info("Loaded best checkpoint from epoch {}".format(checkpoint['epoch']))
+else:
+    logger.info("No checkpoint found, using final model")
+
+# Evaluate on test set
+model.eval()
+model = model.to(gpu)
+g = g.to(gpu)
+
+all_preds = []
+all_labels = []
+
+with th.no_grad():
+    for batch in idx_loader_test:
+        (idx, ) = [x.to(gpu) for x in batch]
+        y_pred = model(g, idx)
+        y_true = g.ndata['label'][idx]
+        
+        all_preds.append(y_pred.argmax(axis=1).cpu().numpy())
+        all_labels.append(y_true.cpu().numpy())
+
+all_preds = np.concatenate(all_preds)
+all_labels = np.concatenate(all_labels)
+
+# Calculate metrics
+test_accuracy = accuracy_score(all_labels, all_preds)
+test_f1_macro = f1_score(all_labels, all_preds, average='macro')
+test_f1_per_class = f1_score(all_labels, all_preds, average=None)
+
+logger.info("\nTest Set Results:")
+logger.info("  Accuracy: {:.4f}".format(test_accuracy))
+logger.info("  F1 Macro: {:.4f}".format(test_f1_macro))
+
+# Get class names from dataset
+if dataset in ['isarcasm']:
+    class_names = ['not_sarcastic', 'sarcastic']
+    logger.info("  F1 Not Sarcastic: {:.4f}".format(test_f1_per_class[0]))
+    logger.info("  F1 Sarcastic: {:.4f}".format(test_f1_per_class[1]))
+elif dataset in ['semeval3a']:
+    class_names = ['not_ironic', 'ironic']
+    logger.info("  F1 Not Ironic: {:.4f}".format(test_f1_per_class[0]))
+    logger.info("  F1 Ironic: {:.4f}".format(test_f1_per_class[1]))
+else:
+    for i, f1 in enumerate(test_f1_per_class):
+        logger.info("  F1 Class {}: {:.4f}".format(i, f1))
+
+logger.info("\nDetailed Classification Report:")
+if dataset in ['isarcasm', 'semeval3a']:
+    logger.info("\n" + classification_report(all_labels, all_preds, 
+                                            target_names=class_names, 
+                                            digits=4))
+else:
+    logger.info("\n" + classification_report(all_labels, all_preds, digits=4))
+
+logger.info("="*80)
+
+# Save final results to file
+results_file = os.path.join(ckpt_dir, 'final_results.txt')
+with open(results_file, 'w') as f:
+    f.write("FINAL TEST RESULTS\n")
+    f.write("="*80 + "\n")
+    f.write("Dataset: {}\n".format(dataset))
+    f.write("Seed: {}\n".format(seed))
+    f.write("Device: {}\n".format(device_type))
+    f.write("\n")
+    f.write("Test Accuracy: {:.4f}\n".format(test_accuracy))
+    f.write("Test F1 Macro: {:.4f}\n".format(test_f1_macro))
+    f.write("\n")
+    if dataset in ['isarcasm']:
+        f.write("F1 Not Sarcastic: {:.4f}\n".format(test_f1_per_class[0]))
+        f.write("F1 Sarcastic: {:.4f}\n".format(test_f1_per_class[1]))
+    elif dataset in ['semeval3a']:
+        f.write("F1 Not Ironic: {:.4f}\n".format(test_f1_per_class[0]))
+        f.write("F1 Ironic: {:.4f}\n".format(test_f1_per_class[1]))
+    else:
+        for i, f1 in enumerate(test_f1_per_class):
+            f.write("F1 Class {}: {:.4f}\n".format(i, f1))
+    f.write("\n")
+    if dataset in ['isarcasm', 'semeval3a']:
+        f.write(classification_report(all_labels, all_preds, 
+                                     target_names=class_names, 
+                                     digits=4))
+    else:
+        f.write(classification_report(all_labels, all_preds, digits=4))
+
+logger.info("Results saved to: {}".format(results_file))
