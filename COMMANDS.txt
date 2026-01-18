@@ -1,0 +1,121 @@
+BertGCN - Quick Command Reference
+=================================
+
+QUICK START (Pick one):
+-----------------------
+
+1. Quick Demo (5 epochs, seed 42):
+   $ ./demo_quick.sh
+
+2. Complete Pipeline (10 epochs, seed 42):
+   $ ./run_complete.sh
+
+3. Full Experiments (50 epochs, seeds 42-46):
+   $ python3 run_experiments.py --datasets isarcasm semeval3a --seeds 42 43 44 45 46 --nb_epochs 50 --device cpu
+
+4. Test Integration:
+   $ python3 test_hf_integration.py
+
+
+INDIVIDUAL COMMANDS:
+--------------------
+
+Prepare Datasets:
+$ python3 prepare_hf_dataset.py --dataset isarcasm
+$ python3 prepare_hf_dataset.py --dataset semeval3a
+$ python3 prepare_hf_dataset.py --dataset all
+
+Build Graphs:
+$ python3 build_graph.py isarcasm --seed 42
+$ python3 build_graph.py semeval3a --seed 43
+
+Train Models:
+$ python3 train_bert_gcn.py --dataset isarcasm --seed 42 --device cpu --nb_epochs 50
+$ python3 train_bert_gcn.py --dataset semeval3a --seed 42 --device cuda --nb_epochs 50
+
+
+BATCH OPERATIONS:
+-----------------
+
+Run Multiple Seeds (bash loop):
+for seed in 42 43 44 45 46; do
+  python3 build_graph.py isarcasm --seed $seed
+  python3 train_bert_gcn.py --dataset isarcasm --seed $seed --nb_epochs 50 --device cpu
+done
+
+Run All Experiments (Python script):
+$ python3 run_experiments.py \
+    --datasets isarcasm semeval3a \
+    --seeds 42 43 44 45 46 \
+    --nb_epochs 50 \
+    --device cpu \
+    --gcn_model gcn
+
+
+COMMON OPTIONS:
+---------------
+
+Datasets:     20ng, R8, R52, ohsumed, mr, isarcasm, semeval3a
+Seeds:        42, 43, 44, 45, 46 (recommended)
+Device:       cpu (safe) or cuda (if compatible)
+Epochs:       5 (quick test), 10 (demo), 50-100 (full training)
+Batch Size:   16 (low memory), 32 (default), 64 (more memory)
+BERT Model:   roberta-base (default), bert-base-uncased, roberta-large
+GCN Model:    gcn (default), gat
+
+
+EXAMPLES:
+---------
+
+Example 1: Quick test
+$ ./demo_quick.sh
+
+Example 2: Single experiment, custom settings
+$ python3 train_bert_gcn.py \
+    --dataset isarcasm \
+    --seed 42 \
+    --device cpu \
+    --nb_epochs 100 \
+    --batch_size 32 \
+    --bert_init roberta-base \
+    --gcn_model gcn
+
+Example 3: Multiple datasets, multiple seeds
+$ python3 run_experiments.py \
+    --datasets isarcasm semeval3a \
+    --seeds 42 43 44 45 46 \
+    --nb_epochs 50 \
+    --device cpu
+
+Example 4: Low memory settings
+$ python3 train_bert_gcn.py \
+    --dataset isarcasm \
+    --seed 42 \
+    --device cpu \
+    --batch_size 16 \
+    --nb_epochs 50
+
+
+TROUBLESHOOTING:
+----------------
+
+GPU not compatible → Add: --device cpu
+Out of memory      → Add: --batch_size 16
+Missing packages   → Run: pip install -r requirements.txt
+Check if working   → Run: python3 test_hf_integration.py
+
+
+OUTPUT LOCATIONS:
+-----------------
+
+Checkpoints: ./checkpoint/{dataset}_seed{seed}_{model}_{timestamp}/
+Logs:        ./checkpoint/{dataset}_seed{seed}_{model}_{timestamp}/training.log
+Data:        ./data/
+
+
+MORE INFO:
+----------
+
+English Guide:    README_HF.md
+Vietnamese Guide: HUONG_DAN.md
+Summary:          SUMMARY.md

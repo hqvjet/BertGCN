@@ -25,7 +25,7 @@ parser.add_argument('--nb_epochs', type=int, default=50)
 parser.add_argument('--bert_init', type=str, default='roberta-base',
                     choices=['roberta-base', 'roberta-large', 'bert-base-uncased', 'bert-large-uncased'])
 parser.add_argument('--pretrained_bert_ckpt', default=None)
-parser.add_argument('--dataset', default='20ng', choices=['20ng', 'R8', 'R52', 'ohsumed', 'mr'])
+parser.add_argument('--dataset', default='20ng', choices=['20ng', 'R8', 'R52', 'ohsumed', 'mr', 'isarcasm', 'semeval3a'])
 parser.add_argument('--checkpoint_dir', default=None, help='checkpoint directory, [bert_init]_[gcn_model]_[dataset] if not specified')
 parser.add_argument('--gcn_model', type=str, default='gcn', choices=['gcn', 'gat'])
 parser.add_argument('--gcn_layers', type=int, default=2)
@@ -34,6 +34,8 @@ parser.add_argument('--heads', type=int, default=8, help='the number of attentio
 parser.add_argument('--dropout', type=float, default=0.5)
 parser.add_argument('--gcn_lr', type=float, default=1e-3)
 parser.add_argument('--bert_lr', type=float, default=1e-5)
+parser.add_argument('--seed', type=int, default=42, help='random seed for reproducibility')
+parser.add_argument('--device', type=str, default='cuda', choices=['cuda', 'cpu'], help='device to use for training')
 
 args = parser.parse_args()
 max_length = args.max_length
@@ -51,6 +53,21 @@ heads = args.heads
 dropout = args.dropout
 gcn_lr = args.gcn_lr
 bert_lr = args.bert_lr
+seed = args.seed
+device_type = args.device
+
+# Set random seeds for reproducibility
+import random
+random.seed(seed)
+np.random.seed(seed)
+th.manual_seed(seed)
+if th.cuda.is_available():
+    th.cuda.manual_seed(seed)
+    th.cuda.manual_seed_all(seed)
+th.backends.cudnn.deterministic = True
+th.backends.cudnn.benchmark = False
+import dgl
+dgl.seed(seed)
 
 if checkpoint_dir is None:
     ckpt_dir = './checkpoint/{}_{}_{}'.format(bert_init, gcn_model, dataset)
@@ -71,10 +88,18 @@ logger.addHandler(fh)
 logger.setLevel(logging.INFO)
 
 cpu = th.device('cpu')
-gpu = th.device('cuda:0')
+gpu = th.device('cuda:0') if device_type == 'cuda' and th.cuda.is_available() else th.device('cpu')
+
+# Override device if CUDA not available
+if device_type == 'cuda' and not th.cuda.is_available():
+    logger.warning('CUDA not available, using CPU instead')
+    device_type = 'cpu'
+    gpu = cpu
 
 logger.info('arguments:')
 logger.info(str(args))
+logger.info('Random seed: {}'.format(seed))
+logger.info('Device: {}'.format(device_type))
 logger.info('checkpoints will be saved in {}'.format(ckpt_dir))
 # Model
 
