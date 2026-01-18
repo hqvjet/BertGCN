@@ -48,11 +48,7 @@ python3 build_graph.py semeval3a --seed 43
 #### Bước 3: Train model
 ```bash
 # Train trên CPU (an toàn)
-python3 train_bert_gcn.py \
-  --dataset isarcasm \
-  --seed 42 \
-  --device cpu \
-  --nb_epochs 50
+:
 
 # Train trên GPU (nếu tương thích)
 python3 train_bert_gcn.py \

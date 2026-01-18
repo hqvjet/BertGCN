@@ -36,6 +36,7 @@ parser.add_argument('--gcn_lr', type=float, default=1e-3)
 parser.add_argument('--bert_lr', type=float, default=1e-5)
 parser.add_argument('--seed', type=int, default=42, help='random seed for reproducibility')
 parser.add_argument('--device', type=str, default='cuda', choices=['cuda', 'cpu'], help='device to use for training')
+parser.add_argument('--patience', type=int, default=10, help='early stopping patience')
 
 args = parser.parse_args()
 max_length = args.max_length
@@ -55,6 +56,7 @@ gcn_lr = args.gcn_lr
 bert_lr = args.bert_lr
 seed = args.seed
 device_type = args.device
+patience = args.patience
 
 # Set random seeds for reproducibility
 import random
@@ -277,13 +279,13 @@ def log_training_results(trainer):
     evaluator.run(idx_loader_val)
     metrics = evaluator.state.metrics
     val_acc, val_nll = metrics["acc"], metrics["nll"]
-    evaluator.run(idx_loader_test)
-    metrics = evaluator.state.metrics
-    test_acc, test_nll = metrics["acc"], metrics["nll"]
+    
     logger.info(
-        "Epoch: {}  Train acc: {:.4f} loss: {:.4f}  Val acc: {:.4f} loss: {:.4f}  Test acc: {:.4f} loss: {:.4f}"
-        .format(trainer.state.epoch, train_acc, train_nll, val_acc, val_nll, test_acc, test_nll)
+        "Epoch: {}  Train acc: {:.4f} loss: {:.4f}  Val acc: {:.4f} loss: {:.4f}"
+        .format(trainer.state.epoch, train_acc, train_nll, val_acc, val_nll)
     )
+    
+    # Early stopping logic
     if val_acc > log_training_results.best_val_acc:
         logger.info("New checkpoint")
         th.save(
@@ -299,9 +301,18 @@ def log_training_results(trainer):
             )
         )
         log_training_results.best_val_acc = val_acc
+        log_training_results.patience_counter = 0
+    else:
+        log_training_results.patience_counter += 1
+        logger.info(f"Patience: {log_training_results.patience_counter}/{patience}")
+        
+        if log_training_results.patience_counter >= patience:
+            logger.info(f"Early stopping triggered after {patience} epochs without improvement")
+            trainer.terminate()
 
 
 log_training_results.best_val_acc = 0
+log_training_results.patience_counter = 0
 g = update_feature()
 trainer.run(idx_loader, max_epochs=nb_epochs)
 
