@@ -36,7 +36,8 @@ parser.add_argument('--gcn_lr', type=float, default=1e-3)
 parser.add_argument('--bert_lr', type=float, default=1e-5)
 parser.add_argument('--seed', type=int, default=42, help='random seed for reproducibility')
 parser.add_argument('--device', type=str, default='cuda', choices=['cuda', 'cpu'], help='device to use for training')
-parser.add_argument('--patience', type=int, default=10, help='early stopping patience')parser.add_argument('--use_custom_test', action='store_true', help='use custom test set for semeval3a dataset')
+parser.add_argument('--patience', type=int, default=10, help='early stopping patience')
+parser.add_argument('--use_custom_test', action='store_true', help='use custom test set for semeval3a dataset')
 args = parser.parse_args()
 max_length = args.max_length
 batch_size = args.batch_size
