@@ -36,8 +36,7 @@ parser.add_argument('--gcn_lr', type=float, default=1e-3)
 parser.add_argument('--bert_lr', type=float, default=1e-5)
 parser.add_argument('--seed', type=int, default=42, help='random seed for reproducibility')
 parser.add_argument('--device', type=str, default='cuda', choices=['cuda', 'cpu'], help='device to use for training')
-parser.add_argument('--patience', type=int, default=10, help='early stopping patience')
-
+parser.add_argument('--patience', type=int, default=10, help='early stopping patience')parser.add_argument('--use_custom_test', action='store_true', help='use custom test set for semeval3a dataset')
 args = parser.parse_args()
 max_length = args.max_length
 batch_size = args.batch_size
@@ -57,6 +56,7 @@ bert_lr = args.bert_lr
 seed = args.seed
 device_type = args.device
 patience = args.patience
+use_custom_test = args.use_custom_test
 
 # Set random seeds for reproducibility
 import random
@@ -182,6 +182,34 @@ idx_loader_train = Data.DataLoader(train_idx, batch_size=batch_size, shuffle=Tru
 idx_loader_val = Data.DataLoader(val_idx, batch_size=batch_size)
 idx_loader_test = Data.DataLoader(test_idx, batch_size=batch_size)
 idx_loader = Data.DataLoader(doc_idx, batch_size=batch_size, shuffle=True)
+
+# Load custom test set if specified (for semeval3a)
+custom_test_loader = None
+custom_test_data = None
+if use_custom_test and dataset == 'semeval3a':
+    logger.info("Loading custom test set for semeval3a...")
+    import pandas as pd
+    custom_test_df = pd.read_csv('data/semeval_2018_3a_custom_test.csv')
+    custom_texts = custom_test_df['sentence'].tolist()
+    custom_labels = custom_test_df['sentiment'].tolist()
+    
+    # Tokenize custom test texts
+    custom_tokenizer_output = tokenizer(custom_texts, max_length=max_length, truncation=True, padding='max_length', return_tensors='pt')
+    custom_input_ids = custom_tokenizer_output['input_ids']
+    custom_attention_mask = custom_tokenizer_output['attention_mask']
+    custom_labels_tensor = th.LongTensor(custom_labels)
+    
+    custom_test_data = {
+        'input_ids': custom_input_ids,
+        'attention_mask': custom_attention_mask,
+        'labels': custom_labels_tensor,
+        'texts': custom_texts
+    }
+    
+    # Create dataloader
+    custom_test_dataset = Data.TensorDataset(th.arange(len(custom_texts), dtype=th.long))
+    custom_test_loader = Data.DataLoader(custom_test_dataset, batch_size=batch_size)
+    logger.info(f"Custom test set loaded: {len(custom_texts)} samples")
 
 # Training
 def update_feature():
@@ -383,6 +411,70 @@ else:
     logger.info("\n" + classification_report(all_labels, all_preds, digits=4))
 
 logger.info("="*80)
+
+# Evaluate on custom test set if available
+if custom_test_loader is not None and custom_test_data is not None:
+    logger.info("\n" + "="*80)
+    logger.info("CUSTOM TEST SET EVALUATION (semeval3a)")
+    logger.info("="*80)
+    
+    model.eval()
+    model = model.to(gpu)
+    
+    custom_preds = []
+    custom_labels = custom_test_data['labels'].numpy()
+    
+    with th.no_grad():
+        # Process in batches
+        for i in range(0, len(custom_test_data['input_ids']), batch_size):
+            batch_input_ids = custom_test_data['input_ids'][i:i+batch_size].to(gpu)
+            batch_attention_mask = custom_test_data['attention_mask'][i:i+batch_size].to(gpu)
+            
+            # Get BERT features
+            bert_output = model.bert_model(input_ids=batch_input_ids, attention_mask=batch_attention_mask)[0][:, 0]
+            
+            # Get predictions (only using BERT classifier, no graph for custom data)
+            logits = model.classifier(bert_output)
+            preds = logits.argmax(axis=1).cpu().numpy()
+            custom_preds.extend(preds)
+    
+    custom_preds = np.array(custom_preds)
+    
+    # Calculate metrics
+    custom_accuracy = accuracy_score(custom_labels, custom_preds)
+    custom_f1_macro = f1_score(custom_labels, custom_preds, average='macro')
+    custom_f1_per_class = f1_score(custom_labels, custom_preds, average=None)
+    
+    logger.info("\nCustom Test Set Results:")
+    logger.info("  Accuracy: {:.4f}".format(custom_accuracy))
+    logger.info("  F1 Macro: {:.4f}".format(custom_f1_macro))
+    
+    if dataset == 'semeval3a':
+        class_names = ['not_ironic', 'ironic']
+        logger.info("  F1 Not Ironic: {:.4f}".format(custom_f1_per_class[0]))
+        logger.info("  F1 Ironic: {:.4f}".format(custom_f1_per_class[1]))
+    
+    logger.info("\nDetailed Classification Report (Custom Test):")
+    logger.info("\n" + classification_report(custom_labels, custom_preds, 
+                                            target_names=class_names, 
+                                            digits=4))
+    logger.info("="*80)
+    
+    # Append to results file
+    with open(results_file, 'a') as f:
+        f.write("\n\n")
+        f.write("CUSTOM TEST SET RESULTS\n")
+        f.write("="*80 + "\n")
+        f.write("Custom Test Accuracy: {:.4f}\n".format(custom_accuracy))
+        f.write("Custom Test F1 Macro: {:.4f}\n".format(custom_f1_macro))
+        f.write("\n")
+        if dataset == 'semeval3a':
+            f.write("F1 Not Ironic: {:.4f}\n".format(custom_f1_per_class[0]))
+            f.write("F1 Ironic: {:.4f}\n".format(custom_f1_per_class[1]))
+        f.write("\n")
+        f.write(classification_report(custom_labels, custom_preds, 
+                                     target_names=class_names, 
+                                     digits=4))
 
 # Save final results to file
 results_file = os.path.join(ckpt_dir, 'final_results.txt')

@@ -97,6 +97,8 @@ python3 test_hf_integration.py
 - `--nb_epochs`: Số epochs (mặc định: 50)
 - `--batch_size`: Batch size (mặc định: 64)
 - `--bert_init`: BERT model (`roberta-base`, `bert-base-uncased`, etc.)
+- `--patience`: Early stopping patience (mặc định: 5)
+- `--use_custom_test`: Sử dụng custom test set cho semeval3a (chỉ hiệu quả với dataset semeval3a)
 
 ### run_experiments.py
 - `--datasets`: Danh sách datasets (mặc định: `isarcasm semeval3a`)
@@ -148,6 +150,17 @@ python3 run_experiments.py \
   --gcn_model gcn
 ```
 
+### Test với custom test set (semeval3a)
+```bash
+# Train và test trên cả official test và custom test
+python3 train_bert_gcn.py \
+  --dataset semeval3a \
+  --seed 42 \
+  --device cuda \
+  --nb_epochs 50 \
+  --use_custom_test
+```
+
 ## Kết Quả
 
 Kết quả được lưu trong:
@@ -165,6 +178,8 @@ Kết quả được lưu trong:
 3. **GPU không tương thích**: Nếu GPU không support (như Tesla M40 với CUDA 12), dùng `--device cpu`
 4. **Progress bars**: Tất cả operations dài đều có progress bars (tqdm)
 5. **Batch size**: Giảm batch size nếu gặp lỗi out of memory
+6. **Early stopping**: Mặc định patience = 5, tự động dừng nếu val acc không cải thiện sau 5 epochs
+7. **Custom test (semeval3a)**: Dùng `--use_custom_test` để evaluate thêm trên custom test set từ `data/semeval_2018_3a_custom_test.csv`
 
 ## Troubleshooting
 

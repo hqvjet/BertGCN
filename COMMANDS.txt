@@ -33,6 +33,9 @@ Train Models:
 $ python3 train_bert_gcn.py --dataset isarcasm --seed 42 --device cpu --nb_epochs 50
 $ python3 train_bert_gcn.py --dataset semeval3a --seed 42 --device cuda --nb_epochs 50
 
+Train with Custom Test (semeval3a only):
+$ python3 train_bert_gcn.py --dataset semeval3a --seed 42 --device cuda --nb_epochs 50 --use_custom_test
+
 
 BATCH OPERATIONS:
 -----------------
