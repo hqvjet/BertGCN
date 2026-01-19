@@ -195,7 +195,7 @@ if use_custom_test and dataset == 'semeval3a':
     custom_labels = custom_test_df['sentiment'].tolist()
     
     # Tokenize custom test texts
-    custom_tokenizer_output = tokenizer(custom_texts, max_length=max_length, truncation=True, padding='max_length', return_tensors='pt')
+    custom_tokenizer_output = model.tokenizer(custom_texts, max_length=max_length, truncation=True, padding='max_length', return_tensors='pt')
     custom_input_ids = custom_tokenizer_output['input_ids']
     custom_attention_mask = custom_tokenizer_output['attention_mask']
     custom_labels_tensor = th.LongTensor(custom_labels)
