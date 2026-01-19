@@ -73,6 +73,17 @@ def prepare_semeval(output_dir='data'):
                     f_clean.write(cleaned + '\n')
     
     print(f"✓ Prepared {dataset_name} dataset")
+    
+    # Check for custom test set
+    custom_test_path = f'{output_dir}/semeval_2018_3a_custom_test.csv'
+    if os.path.exists(custom_test_path):
+        print(f"✓ Custom test set found: {custom_test_path}")
+    else:
+        print(f"⚠ Warning: Custom test set not found at {custom_test_path}")
+        print(f"  If you want to use --use_custom_test, please place the CSV file at:")
+        print(f"  {custom_test_path}")
+        print(f"  Expected CSV columns: sentence, sentiment")
+    
     return dataset_name
 
 if __name__ == '__main__':
